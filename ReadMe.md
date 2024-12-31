@@ -1,6 +1,38 @@
 # Usage Instructions
 
-Users can utilize this script by modifying the start date and the duration of the download within the main function of each script.
+This Python toolbox is designed for **BDS PPP-B2b** and **Galileo HAS decoding**. The key features of the **NavDecoder** are as follows:
+
+1. **Download tools** for retrieving navigation and MGEX orbit/clock products.
+2. **Support for raw binary HAS data** from Septentrio GNSS receivers. The system can be easily extended to support binary data from various manufacturers by extracting raw Galileo C/NAV data for input into the decoding function.
+3. **Support for B2b data** from both **Septentrio** and **Unicore** GNSS receivers:
+   - Septentrio provides raw binary format, which requires an LDPC decoder to recover plain corrections.
+   - Unicore offers a plain ASCII format that can be directly processed to recover corrections.
+4. **Capability to save corrections** in the **BNC universal format**.
+5. **Capability to save corrections** in **SP3** and **CLK formats**.
+6. **Provision of an archive** for **B2b** and **HAS corrections**.
+
+### Main Functions
+
+- **Decoding the Septentrio HAS Binary format** from the `"GALRawCNAV"` block: `decode_HAS_sept`
+- **Decoding the Septentrio B2b Binary format** from the `"BDSRawB2b"` block: `decode_B2B_sept`
+- **Decoding the Unicor B2b Binary format** from the `"PPPB2bInfo"` block: `decode_B2B_UM982`
+
+### Configuration
+
+The configuration settings are located in the following section of the code:
+
+```python
+# Start of configuration
+max_orbit_delay = 300  # Maximum orbit delay in seconds
+max_clock_delay = 30   # Maximum clock delay in seconds
+start_date = datetime(2024, 5, 14)  # Start date for the process
+process_days = 1  # Number of days to process
+file_has_template = r'test_data\SEPT{}0.{}__SBF_GALRawCNAV.txt'  # Template for HAS files
+nav_file_template = r'test_data\eph\BRDC00IGS_R_{}0000_01D_MN.rnx'  # Template for navigation files
+corr_dir_template = r'test_data\SEPT{}_HAS'  # Directory for correction files
+# End of configuration
+
+You only need to modify the **start date**, **processing duration**, and **file paths**.
 
 ## Directory Structure
 
