@@ -13,11 +13,11 @@ This Python toolbox is designed for **BDS PPP-B2b** and **Galileo HAS decoding**
 
 ### Main Functions
 
-- **Decoding the Septentrio HAS Binary format** from the `"GALRawCNAV"` block: `decode_HAS_sept`
-- **Decoding the Septentrio B2b Binary format** from the `"BDSRawB2b"` block: `decode_B2B_sept`
-- **Decoding the Unicor B2b Binary format** from the `"PPPB2bInfo"` block: `decode_B2B_UM982`
+- **Decoding the Septentrio HAS Binary format** from the `"GALRawCNAV"` block: `decode_HAS_sept.py`
+- **Decoding the Septentrio B2b Binary format** from the `"BDSRawB2b"` block: `decode_B2B_sept.py`
+- **Decoding the Unicor B2b Binary format** from the `"PPPB2bInfo"` block: `decode_B2B_UM982.py`
 
-### Configuration
+### Configuration for the decoding:
 
 The configuration settings are located in the following section of the code:
 
@@ -31,16 +31,17 @@ file_has_template = r'test_data\SEPT{}0.{}__SBF_GALRawCNAV.txt'  # Template for 
 nav_file_template = r'test_data\eph\BRDC00IGS_R_{}0000_01D_MN.rnx'  # Template for navigation files
 corr_dir_template = r'test_data\SEPT{}_HAS'  # Directory for correction files
 # End of configuration
-
+ ```
 You only need to modify the **start date**, **processing duration**, and **file paths**.
 
 ## Directory Structure
+- **NavDecoder/B2b_HAS_decoder**: Tools for decoding Septentrio B2b HAS data.
+- **NavDecoder/B2b_UM980_decoder**: Tools for decoding Unicore B2b data.
+- **NavDecoder/bin**: Contains binary executables for downloading GNSS products.
+- **NavDecoder/download**: Contains scripts for downloading various GNSS data.
+- **NavDecoder/test_data**: Example data for decoding.
 
-- **NavDecoder/bin**: Contains the necessary binary executables for downloading GNSS products.
-- **NavDecoder/download**: Contains the required scripts for downloading various GNSS data.
-
-## Supported Products
-
+## Supported Products of the download tool
 1. **Broadcast Navigation Files**: Supports Rinex 3.x and Rinex 4.x formats.
 2. **Precise Orbits/Clock Files**:
    - **Near-Real-Time (NRT)**:
@@ -60,7 +61,6 @@ You only need to modify the **start date**, **processing duration**, and **file 
 5. **Rinex Navigation Files**: Supports both Rinex 3.x and 4.x formats.
 
 ## Python Script Functions
-
 - **cmn_tools.py**: Offers essential utilities for time and coordinate conversion.
 - **down_eph_clk.py**: Downloads orbit and clock data from IGS/MGEX data centers.
 - **down_PPP_products.py**: Downloads navigation Rinex files (3.x and 4.x), orbits/clocks, and ISB from data centers.
@@ -69,7 +69,3 @@ You only need to modify the **start date**, **processing duration**, and **file 
 - **down_rinex_nav_4x.py**: Downloads Rinex navigation files in 4.x format.
 - **down_rinex_obs.py**: Downloads Rinex observation files.
 - **down_sinex_pos.py**: Downloads Sinex Pos files and extracts reference coordinates for the specified station.
-
-## Usage Instructions
-
-To begin using the scripts, users should modify the start date and the length of the download period by adjusting the parameters in the main function of each respective script.
