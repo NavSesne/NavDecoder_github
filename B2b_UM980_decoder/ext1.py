@@ -1,13 +1,12 @@
-
 def extract_data_from_line(line):
-    # 将每一行按逗号分割
+    # Split each line by commas
     parts = line.split(',')
 
-    # 检查是否有足够的数据
+    # Check if there is enough data
     if len(parts) < 15:
         return None
 
-    # 提取所需的数据
+    # Extract the required data
     week = parts[4]
     wn = str(int(parts[5]) // 1000)
     prn = str(int(parts[10]) - 160)
@@ -15,11 +14,12 @@ def extract_data_from_line(line):
     iodp = parts[12]
     todbdt = parts[13]
 
-    # 将第15个数据转换为二进制，并去除'*'后的部分，确保长度为原十六进制字符串长度的4倍
+    # Convert the 15th data element to binary, remove the part after '*',
+    # and ensure the length is four times the original hexadecimal string length
     hex_data = parts[14].split('*')[0]
     binary_data = bin(int(hex_data, 16))[2:].zfill(len(hex_data) * 4)
 
-    # 切片提取不同卫星系统的数据
+    # Slice and extract data for different satellite systems
     bds = binary_data[:63]
     gps = binary_data[63:100]
     galileo = binary_data[100:137]

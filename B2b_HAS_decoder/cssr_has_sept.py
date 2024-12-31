@@ -16,7 +16,7 @@ from B2b_HAS_decoder.ephemeris import eph2pos, findeph,eph2rel
 from B2b_HAS_decoder.cssrlib import cssr, sCSSR, sCSSRTYPE, sCType
 
 class cssr_has(cssr):
-    def __init__(self, foutname=None):  # 初始化属性
+    def __init__(self, foutname=None):  # Initialize attributes
         super().__init__(foutname)
         self.MAXNET = 1
         self.cssrmode = sCSSRTYPE.GAL_HAS_SIS
@@ -32,12 +32,11 @@ class cssr_has(cssr):
         self.GF = galois.GF(256)
 
     """
-    计算给定n位整数的有符号值
-    u: 输入的n位整数值。
-    n: 整数的位数。
-    scl: 缩放因子，用于对整数值进行缩放
+    Calculate the signed value for a given n-bit integer
+    u: Input n-bit integer value.
+    n: Number of bits in the integer.
+    scl: Scaling factor for scaling the integer value.
     """
-
     def sval(self, u, n, scl):
         """ calculate signed value based on n-bit int, lsb """
         invalid = -2 ** (n - 1)
@@ -45,131 +44,141 @@ class cssr_has(cssr):
         y = np.nan if u == invalid or u == dnu else u * scl
         return y
 
-    '''对于Clock消息提供了所有在Mask块中指定的卫星的时钟更正。这意味着对于Mask中的每个卫星，都会有一个时钟更正值。
-     Clock Subset消息则只提供了一个卫星子集的时钟更正。这个子集是通过
-     Clock Subset Corrections Block中的一个额外的子集掩码来指定的，
-     该掩码指出了哪些卫星在这个子集中。这允许在需要时只更新一部分卫星的时钟更正，而不是全部。'''
+    '''The Clock message provides clock corrections for all satellites specified in the Mask block. 
+     This means that for each satellite in the Mask, there is a clock correction value. 
+     The Clock Subset message, on the other hand, provides clock corrections for only a subset of satellites. 
+     This subset is specified by an additional subset mask in the Clock Subset Corrections Block, 
+     which indicates which satellites are included in this subset. 
+     This allows updating clock corrections for only a portion of satellites when needed, rather than for all satellites.'''
 
     def decode_cssr_clk_sub(self, msg, i=0):
-        head, i = self.decode_head(msg, i)  # 调用解码头文件函数解码iodssr
+        head, i = self.decode_head(msg, i)  # Call the decode_head function to decode the iodssr
         self.flg_net = False
-        if self.iodssr != head['iodssr']:  # 检查消息头部中的iodssr字段是否与当前对象中存储的iodssr字段相匹配如果不匹配，则返回-1表示解码失败。
+        if self.iodssr != head['iodssr']:  # Check if the iodssr field in the message header matches the stored iodssr in the object
             return -1
 
-        nclk_sub = bs.unpack_from('u4', msg, i)[0]  # 从输入的msg字节流的位置i开始解包一个4字节的无符号整数，并返回解包钟差子类型。
+        nclk_sub = bs.unpack_from('u4', msg, i)[0]  # Unpack a 4-byte unsigned integer from the byte stream starting at i to get the clock subset type
         i += 4
         for j in range(nclk_sub):
-            gnss, dcm = bs.unpack_from('u4u2', msg, i)  # 六个一循环的，前四个赋值给gnss（GPS,Galileo），后二个赋值给dcm表示时钟差倍数
-            # （Delta Clock Multipliers），是HAS消息中时钟全集更正块的参数。它指示应用于不同GNSS的时钟差更正的乘数。
+            gnss, dcm = bs.unpack_from('u4u2', msg, i)  # Unpack gnss (GPS, Galileo) and dcm (Delta Clock Multipliers) values
+            # These values are the parameters for the full clock correction block in the HAS message. 
+            # It indicates the multipliers for clock corrections for different GNSS.
             i += 6
-            idx_s = np.where(np.array(self.gnss_n) == gnss)  # 从 self.gnss_n 中找到与 gnss 相等的值的索引
-            mask_s = bs.unpack_from('u' + str(self.nsat_g[gnss]), msg, i)[0]  # 函数解码从字节流 msg 中提取的卫星掩码
-            i += self.nsat_g[gnss]  # 移动到下一个卫星
-            idx, nclk = self.decode_mask(mask_s, self.nsat_g[gnss])  # 传递有效的位的索引值，对应卫星数的掩码
-            for k in range(nclk):  # 有多少课可用卫星就循环多少次
+            idx_s = np.where(np.array(self.gnss_n) == gnss)  # Find the index of gnss in self.gnss_n
+            mask_s = bs.unpack_from('u' + str(self.nsat_g[gnss]), msg, i)[0]  # Decode the satellite mask from the byte stream
+            i += self.nsat_g[gnss]  # Move to the next satellite
+            idx, nclk = self.decode_mask(mask_s, self.nsat_g[gnss])  # Decode the mask and get the indices of the valid satellites
+            for k in range(nclk):  # Loop for the number of available satellites
                 dclk = bs.unpack_from('s' + str(self.dclk_blen), msg, i) \
-                       * self.dclk_scl * (dcm + 1)  # 解钟差改正数
-                self.lc[0].dclk[idx_s[idx[k]]] = dclk  # 将钟差改正数存起来
+                       * self.dclk_scl * (dcm + 1)  # Decode the clock correction value
+                self.lc[0].dclk[idx_s[idx[k]]] = dclk  # Store the clock correction value
                 i += self.dclk_blen
         return i
-      #解码每种信息的头部信息
+
+    # Decode the header information for each message
     def decode_head(self, msg, i, st=-1):
 
         if st == sCSSR.MASK:
             ui = 0
         else:
-            ui = bs.unpack_from('u4', msg, i)[0]  # 解码的第一个元素赋值给ui
+            ui = bs.unpack_from('u4', msg, i)[0]  # Decode the first element and assign to ui
             i += 4
 
         if self.tow0 >= 0:
             self.tow = self.tow0 + self.toh
             if self.week >= 0:
-                self.time = gpst2time(self.week, self.tow)  # 计算时间进行时间转换
+                self.time = gpst2time(self.week, self.tow)  # Calculate and convert the time
 
-        head = {'uint': ui, 'mi': 0, 'iodssr': self.iodssr}  # 信息类型 SSR 版本号
+        head = {'uint': ui, 'mi': 0, 'iodssr': self.iodssr}  # Information type SSR version
         return head, i
-
     def decode_cssr(self, msg, i=0):
-        if self.msgtype != 1:  # only MT=1 defined，判断信息类型，如果不为1解码失败
+        if self.msgtype != 1:  # Only MT=1 is defined, check message type. If not 1, decoding fails
             print(f"invalid MT={self.msgtype}")
             return False
-        # time of hour
-        # flags: mask,orbit,clock,clock subset,cbias,pbias,mask_id,iodset_id
+        # Time of hour
+        # Flags: mask, orbit, clock, clock subset, cbias, pbias, mask_id, iodset_id
         self.toh, flags, res, mask_id, self.iodssr = \
-            bs.unpack_from('u12u6u4u5u5', msg, i)  # 解码后的值分别赋值给 时内秒、flags、res、掩码标志 和 iodssr。
+            bs.unpack_from('u12u6u4u5u5', msg, i)  # The decoded values are assigned to time of hour, flags, res, mask ID, and iodssr.
         i += 32
 
         if self.monlevel > 0 and self.fh is not None:
             self.fh.write("##### Galileo HAS SSR: TOH{:6d} flags={:12s} mask_id={:2d} iod_s={:1d}\n"
-                          .format(self.toh, bin(flags), mask_id, self.iodssr))
+                        .format(self.toh, bin(flags), mask_id, self.iodssr))
 
-        if self.toh >= 3600:  # 检查toh 是否大于等于3600。如果大于等于3600秒，返回 False 表示解码失败。
+        if self.toh >= 3600:  # Check if toh is greater than or equal to 3600. If it is, return False to indicate decoding failure.
             print(f"invalid TOH={self.toh}")
             return False
-        '''检查标志位中的第6位，即掩码信息（mask block）是否存在。如果存在，将 mask_id 设置为解码的掩码标识，
-         并将 subtype 设置为 sCSSR.MASK。然后调用 decode_cssr_mask 方法来解码掩码部分的HAS信息。'''
+        '''Check the 6th bit in the flags, which indicates whether the mask information (mask block) exists. 
+        If it exists, set mask_id to the decoded mask identifier, and set subtype to sCSSR.MASK.
+        Then, call decode_cssr_mask to decode the mask block of the HAS message.'''
         if (flags >> 5) & 1:  #
             self.mask_id = mask_id
             self.subtype = sCSSR.MASK
             i = self.decode_cssr_mask(msg, i)
-        '''检查标志位中的第5位，即轨道（orbit block）信息是否存在。如果存在，将 subtype 设置为 sCSSR.ORBIT。
-        然后调用 decode_cssr_orb 方法来解码轨道部分的HAS信息获取轨道改正数。如果 monlevel 大于0且文件句柄 fh 不为空，则调用 out_log 方法，输出解码内容。'''
+        '''Check the 5th bit in the flags, which indicates whether the orbit (orbit block) information exists.
+        If it exists, set subtype to sCSSR.ORBIT. Then call decode_cssr_orb to decode the orbit part of the HAS message to get orbit corrections. 
+        If monlevel is greater than 0 and the file handle fh is not None, call out_log to output the decoded content.'''
         if (flags >> 4) & 1:  # orbit block
             self.subtype = sCSSR.ORBIT
             i = self.decode_cssr_orb(msg, i)
             if self.monlevel > 0 and self.fh is not None:
                 self.out_log()
-        '''检查标志位中的第4位，即时钟（clock block）信息是否存在。如果存在，将 mask_id_clk 设置为解码的时钟掩码标识，并将 subtype 设置为 sCSSR.CLOCK。
-        然后调用 decode_cssr_clk 方法来解码时钟部分的HAS消息，获取钟差改正数。如果 monlevel 大于0且文件句柄 fh 不为空，则调用 out_log 方法，输出解码内容。'''
+        '''Check the 4th bit in the flags, which indicates whether the clock (clock block) information exists.
+        If it exists, set mask_id_clk to the decoded clock mask identifier, and set subtype to sCSSR.CLOCK.
+        Then call decode_cssr_clk to decode the clock part of the HAS message to get clock corrections. 
+        If monlevel is greater than 0 and the file handle fh is not None, call out_log to output the decoded content.'''
         if (flags >> 3) & 1:  # clock block
             self.mask_id_clk = mask_id
             self.subtype = sCSSR.CLOCK
             i = self.decode_cssr_clk(msg, i)
             if self.monlevel > 0 and self.fh is not None:
                 self.out_log()
-        '''检查标志位中的第3位，即时钟子集块（clock subset block）是否存在。
-        如果存在，调用 decode_cssr_clk_sub 方法来解码时钟子集部分的HAS信息。'''
+        '''Check the 3rd bit in the flags, which indicates whether the clock subset block (clock subset block) exists.
+        If it exists, call decode_cssr_clk_sub to decode the clock subset part of the HAS message.'''
         if (flags >> 2) & 1:  # clock subset block
             i = self.decode_cssr_clk_sub(msg, i)
-        '''检查标志位中的第2位，即码偏差（code bias block）是否存在。如果存在，将 subtype 设置为 sCSSR.CBIAS。
-        然后调用 decode_cssr_cbias 方法来解码码偏差部分的HAS信息。如果 monlevel 大于0且文件句柄 fh 不为空，则调用 out_log 方法输出解码内容。'''
+        '''Check the 2nd bit in the flags, which indicates whether the code bias (code bias block) exists.
+        If it exists, set subtype to sCSSR.CBIAS. Then call decode_cssr_cbias to decode the code bias part of the HAS message.
+        If monlevel is greater than 0 and the file handle fh is not None, call out_log to output the decoded content.'''
         if (flags >> 1) & 1:  # code bias block
             self.subtype = sCSSR.CBIAS
             i = self.decode_cssr_cbias(msg, i)
             if self.monlevel > 0 and self.fh is not None:
                 self.out_log()
-        '''检查标志位中的第1位，即相位偏差（phase bias block）是否存在。如果存在，将 subtype 设置为 sCSSR.PBIAS。
-        然后调用 decode_cssr_pbias 方法来解码相位偏差部分的HAS信息。如果 monlevel 大于0且文件句柄 fh 不为空，则调用 out_log 方法输出解码内容。'''
+        '''Check the 1st bit in the flags, which indicates whether the phase bias (phase bias block) exists.
+        If it exists, set subtype to sCSSR.PBIAS. Then call decode_cssr_pbias to decode the phase bias part of the HAS message.
+        If monlevel is greater than 0 and the file handle fh is not None, call out_log to output the decoded content.'''
         if (flags >> 0) & 1:  # phase bias block
             self.subtype = sCSSR.PBIAS
             i = self.decode_cssr_pbias(msg, i)
             if self.monlevel > 0 and self.fh is not None:
                 self.out_log()
 
-     #提取HAS页面头中的字段
+    # Extract fields from the HAS page header
     def decode_has_header(self, buff, i):
-        if bs.unpack_from('u24', buff, i)[
-            0] == 0xaf3bc3:  # 解码24位的无符号整数，然后与预先定义的值 0xaf3bc3 进行比较。如果相等，表示这是一个空消息，直接返回一组全部为0的值。
+        if bs.unpack_from('u24', buff, i)[0] == 0xaf3bc3:  # Decode the 24-bit unsigned integer and compare it with the predefined value 0xaf3bc3. If equal, it's an empty message, return a set of all zeros.
             return 0, 0, 0, 0, 0
 
         hass, res, mt, mid, ms, pid = bs.unpack_from('u2u2u2u5u5u8', buff, i)
-        # 如果不是空消息，则继续解包HAS消息的头部信息。这一行使用 unpack_from 方法解包了六个整数，每个整数的位数分别为2、2、2、5、5、8位，
-        # 对应于 hass、res、mt、mid、ms 和 pid。
-        # 表示HAS状态（HAStatus），是HAS页面头中的2位字段。它指示HAS服务的状态，例如"00"表示测试模式，"01"表示操作模式。
-        # mt不为1时解码失败，res是保留信息，：mid表示消息ID（Message ID），是HAS页面头中的5位字段。它唯一标识正在传输的消息，ms（Message Size）确实表示未编码消息的大小，以页面数表示
-        # pid表示页面ID（Page ID），是HAS页面头中的8位字段。它唯一标识正在传输的HAS编码页面。
+        # If not an empty message, continue unpacking the HAS message header. This line uses unpack_from to decode six integers, each with 2, 2, 2, 5, 5, and 8 bits, 
+        # corresponding to hass, res, mt, mid, ms, and pid.
+        # hass indicates the HAS status, which is a 2-bit field in the HAS page header. It shows the status of the HAS service, e.g., "00" means test mode, "01" means operation mode.
+        # If mt is not 1, decoding fails. res is reserved information. mid represents the message ID, a 5-bit field in the HAS page header, which uniquely identifies the message being transmitted.
+        # ms represents the message size, indicating the size of the unencoded message in terms of pages.
+        # pid represents the page ID, an 8-bit field in the HAS page header, which uniquely identifies the HAS encoded page being transmitted.
 
         ms += 1
         return hass, mt, mid, ms, pid
 
-    # 这个方法非常重要，因为它可以从接收的这些页面中恢复出完整的HAS消息，进而提取出卫星更正信息。
+    # This method is very important because it recovers the complete HAS message from the received pages and extracts satellite correction information.
     def decode_has_page(self, idx, has_pages, gMat, ms):
         """ HPVRS decoding for RS(255,32,224) """
         HASmsg = bytes()
         k = len(idx)
-        '''使用生成矩阵和页面内容对HAS进行解码。首先，通过索引列表从 has_pages 中取出相应的页面内容，
-        然后将这个页面内容表示为Galois域上的矩阵 Wd，尺寸为k x 53。同时，从生成矩阵中取出与索引列表对应的部分，然后对该部分进行逆矩阵运算，
-        得到逆矩阵 Dinv，尺寸为 k x k。接着，将 Dinv 乘以 Wd 得到解码后的消息 Md，尺寸为 k x 53。最后，将 Md 转换为字节对象并赋值给 HASmsg。'''
+        '''Use the generator matrix and page content to decode the HAS message. First, extract the corresponding page content from has_pages using the index list, 
+        then represent this page content as a matrix Wd in the Galois field with dimensions k x 53. 
+        At the same time, extract the corresponding part from the generator matrix, then perform an inverse matrix operation on it to get the inverse matrix Dinv with dimensions k x k.
+        Next, multiply Dinv by Wd to get the decoded message Md with dimensions k x 53. Finally, convert Md to a byte object and assign it to HASmsg.'''
         if k >= ms:
             Wd = self.GF(has_pages[idx, :])  # kx53
             Dinv = np.linalg.inv(self.GF(gMat[idx, :k]))  # kxk
@@ -177,6 +186,7 @@ class cssr_has(cssr):
             HASmsg = np.array(Md).tobytes()
 
         return HASmsg
+
     def log_msg(self,msg):
         if self.monlevel > 0 and self.fh is not None:
             self.fh.write(msg+"\n")

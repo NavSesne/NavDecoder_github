@@ -15,15 +15,12 @@ from B2b_HAS_decoder.cssr_has_sept import cssr_has
 from B2b_HAS_decoder.rinex import rnxdec
 from datetime import datetime, timedelta
 from B2b_HAS_decoder.cssrlib import sCSSR,sCType,local_corr
+from download.down_PPP_products import *
 
-max_orbit_delay=300
-max_clock_delay=30
-# 因为Galileo的轨道和钟差可以一个历元解析出来，所以直接使用就行，不用这里个做复制，检查更新
 class HASData:
     def __init__(self):
         self.init_empty()
     def init_empty(self):
-        # 初始化所有属性为None或空列表/字典，保持结构一致但不包含实际数据
         self.cssrmode = None
         self.sat_n = []
         self.iodssr = None
@@ -33,7 +30,6 @@ class HASData:
         self.subtype = None
 
     def update_value_from(self, source_object):
-        # 从提供的对象复制属性，如果属性不存在则使用默认值
         self.cssrmode = getattr(source_object, 'cssrmode', None)
         self.sat_n = deepcopy(getattr(source_object, 'sat_n', []))
         self.iodssr = deepcopy(getattr(source_object, 'iodssr', None))
@@ -85,38 +81,47 @@ class HASData:
         self.lc[0].dclk[sat] = np.nan
         self.lc[0].t0[sat][sCType.CLOCK] = None
 
-# Start epoch and number of epochs
-#
+def relative_to_absolute(relative_path):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, relative_path)
+
+# Start for the configuration
+max_orbit_delay=300
+max_clock_delay=30
 start_date = datetime(2024, 5, 14)
 process_days = 1
-file_has_template = r'D:\work_lewen\source_code\git_lewen\NavDecoder\test_data\SEPT{}0.{}__SBF_GALRawCNAV.txt'
-# nav_file_template = r'E:\GNSS_Data\products\eph\BRD400DLR_S_{}0000_01D_MN.rnx'
-nav_file_template = r'D:\work_lewen\source_code\git_lewen\NavDecoder\test_data\BRDC00GOP_R_{}0000_01D_MN.rnx'
-corr_dir_template = r'D:\work_lewen\source_code\git_lewen\NavDecoder\test_data\SEPT{}_HAS_new1'
-
+file_has_template = r'test_data\SEPT{}0.{}__SBF_GALRawCNAV.txt'
+nav_file_template = r'test_data\eph\BRDC00IGS_R_{}0000_01D_MN.rnx'
+corr_dir_template = r'test_data\SEPT{}_HAS'
+#End for the configuration
+HAS_GAL = relative_to_absolute(file_has_template)
+nav_GAL = relative_to_absolute(nav_file_template)
+sol_GAL = relative_to_absolute(corr_dir_template)
 for i in range(process_days):
     current_date = start_date + timedelta(days=i)
+    previous_date = current_date - timedelta(days=1)  
+    next_date = current_date + timedelta(days=1)  
     ep = [current_date.year, current_date.month, current_date.day,
                   current_date.hour, current_date.minute, current_date.second]
     doy = current_date.timetuple().tm_yday
     year = current_date.year
     formatted_date = f"{year}{str(doy).zfill(3)}" 
 
-    # 替换文件名中的年积日和年份
-    file_has = file_has_template.format(str(doy).zfill(3),year-2000)
-    nav_file = nav_file_template.format(formatted_date)
+    down_NAV_data(previous_date,2,os.path.dirname(nav_GAL))
+    file_has = HAS_GAL.format(str(doy).zfill(3),year-2000)
+    nav_file = nav_GAL.format(formatted_date)
 
+    if not os.path.exists(file_has):
+        print("not found file: "+file_has)
     # extend the navigation file to 3-days
-    previous_date = current_date - timedelta(days=1)
     yyyy_doy0 = f"{year}{str(previous_date.timetuple().tm_yday).zfill(3)}" 
-    nav_file0 = nav_file_template.format(yyyy_doy0)
+    nav_file0 = nav_GAL.format(yyyy_doy0)
 
-    next_date = current_date + timedelta(days=1)
     yyyy_doy2 = f"{year}{str(next_date.timetuple().tm_yday).zfill(3)}" 
-    nav_file2 = nav_file_template.format(yyyy_doy2)
+    nav_file2 = nav_GAL.format(yyyy_doy2)
 
     # generate the output file
-    corr_dir = corr_dir_template.format(formatted_date)
+    corr_dir = sol_GAL.format(formatted_date)
     parent_dir = os.path.dirname(corr_dir)
     if not os.path.exists(parent_dir):
         os.makedirs(parent_dir)
@@ -147,7 +152,8 @@ for i in range(process_days):
         v[i]['prn'] = int(prn[1:])
 
     # Read the Galileo-HAS Solomon matrix
-    file_gm = r"B2b_HAS_decoder\Galileo-HAS-SIS-ICD_1.0_Annex_B_Reed_Solomon_Generator_Matrix.txt"
+    currentpath=os.path.dirname(os.path.abspath(__file__))
+    file_gm=os.path.join(currentpath,r"B2b_HAS_decoder\Galileo-HAS-SIS-ICD_1.0_Annex_B_Reed_Solomon_Generator_Matrix.txt")
     gMat = np.genfromtxt(file_gm, dtype="u1", delimiter=",")
 
     # Read the navigation file from the successive 3-day
@@ -161,8 +167,6 @@ for i in range(process_days):
     sp_out = peph()
     orb = peph()
 
-    # 这两个变量是所有卫星通用的，如果某刻卫星中断后重新出现，基于这个时间是没办法判断的
-    # 所以这个变量只能用来判断数据是否历元更新，因为历元是按照时间来的
     record_orbit_update_time=None
     record_clock_update_time=None
     orbit_data={}
@@ -254,7 +258,6 @@ for i in range(process_days):
                 str_obs1 = time2str(time_clock_sat)
                 str_obs2 = time2str(record_clock_update_time)
                 time_debug = epoch2time([2024, 3, 16, 0, 0, 45])
-                # 根据current_time查找最新，可用的产品，实时的产品时间应远于目前的
                 str_obs=time2str(current_time)
                 if abs(timediff(current_time, time_debug))<1:
                     print(time2str(time_debug))

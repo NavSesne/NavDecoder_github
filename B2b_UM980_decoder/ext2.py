@@ -1,6 +1,6 @@
 def extract_data_from_line(line):
     parts = line.split(',')
-    if len(parts) < 56:  # 确保每行有足够的数据
+    if len(parts) < 56: 
         return None
     week=parts[4]
     wn = str(int(parts[5]) // 1000)
@@ -17,7 +17,7 @@ def extract_data_from_line(line):
         Aorb = float(parts[i + 3]) * 0.0064
         Corb = float(parts[i + 4]) * 0.0064
         iodcorr = parts[i + 5]
-        URAI = parts[i + 6].split('*')[0]  # 去除可能存在的'*'符号
+        URAI = parts[i + 6].split('*')[0]
         result += f' satslot:{satslot} iodn:{iodn} Rorb:{Rorb:.4f} Aorb:{Aorb:.4f} Corb:{Corb:.4f} iodcorr:{iodcorr} URAI:{URAI}'
 
     return result + '\n'

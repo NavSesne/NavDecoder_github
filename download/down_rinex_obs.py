@@ -110,12 +110,12 @@ def down_rinex_obs_highrate(tmn,local_dir,station,ftp_name):
 
 
 if __name__ == "__main__":
-    tstart = datetime.datetime(2024, 6,  6, 0, 0, 0)
-    tlen=30
-    # stations=['HKSL','HKWS','NCKU','KMNM','TNML','TWTF','LHAZ','JFNG','WUHN','SHAO','BJFS','BJNM','CHAN','URUM']
-    stations=["WUH2","GAMG","ULAB","URUM","POL2","BIK0","LCK4","JFNG","WUH2"] #JFNG
+    tstart = datetime(2024, 5,  9, 0, 0, 0)
+    tlen=7
+    stations=['HKSL','HKWS','NCKU','KMNM','TNML','TWTF','LHAZ','JFNG','WUHN','SHAO','BJFS','BJNM','CHAN','URUM']
+    # stations=["WUH2","GAMG","ULAB","URUM","POL2","BIK0","LCK4","JFNG","WUH2"] #JFNG
     data_center="WHU"  #WHU  IGN CDDIS
-    local_dir = r'E:\GNSS_Data\MGEX_OBS'
+    local_dir = r'E:\MGEX_Data'
     # local_dir = r'E:\GNSS_Data\MGEX_OBS\highrate'
     dates=[]
     tmn=tstart
@@ -124,11 +124,11 @@ if __name__ == "__main__":
         for day in range(tlen):
             futures = []
             for station in stations:
-                future = executor.submit(down_rinex_obs_highrate, tmn, local_dir, station, data_center)
+                # future = executor.submit(down_rinex_obs_highrate, tmn, local_dir, station, data_center)
                 # futures.append(future)
                 # data center: WHU CDDIS
-                # down_rinex_obs(tmn,local_dir,station,data_center)
+                down_rinex_obs(tmn,local_dir,station,data_center)
                 # down_rinex_obs_highrate(tmn,local_dir,station,data_center)
             tmn = tmn + relativedelta(days=1)
         end_time = timeit.default_timer() - start_time
-        print(f"============下载第{tmn.strftime('%Y-%m-%d %H:%M:%S')}天数据完成! 总共耗时: {end_time:.2f} 秒")
+        print(f"============ Completed downloading data for {tmn.strftime('%Y-%m-%d %H:%M:%S')}! Total time taken: {end_time:.2f} seconds")

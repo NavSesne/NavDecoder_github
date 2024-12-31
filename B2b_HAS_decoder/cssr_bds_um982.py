@@ -1,16 +1,10 @@
-"""
-BDS PPP correction data decoder
-
-[1] BeiDou Navigation Satellite System Signal In Space Interface Control Document
-Precise Point Positioning Service Signal PPP-B2b (Version 1.0), 2020
-"""
-
 import numpy as np
 import bitstruct as bs
-from B2b_HAS_decoder.gnss import *
 from B2b_HAS_decoder.cssrlib import cssr, sCSSR, sCSSRTYPE, sGNSS, prn2sat, sCType
-from B2b_HAS_decoder.ephemeris import eph2pos, findeph,eph2rel
-from B2b_HAS_decoder.peph import peph_t
+from B2b_HAS_decoder.gnss import bdt2time, bdt2gpst, uGNSS, uSIG, uTYP, rSigRnx, vnorm, sat2id, sat2prn, time2str, rCST, timediff, time2epoch
+from B2b_HAS_decoder.ephemeris import eph2pos, findeph, eph2rel
+from B2b_HAS_decoder.peph import peph, peph_t
+import pdb
 
 
 class cssr_bdsC(cssr):
@@ -73,18 +67,18 @@ class cssr_bdsC(cssr):
         usig_tbl = usig_tbl_[sys]
         return rSigRnx(sys, utyp, usig_tbl[ssig])
 
-    def sval(self, u): #检核数据是否超限
-        """ calculate signed value based on n-bit int, lsb """
+    def sval(self, u):
+        """ Calculate signed value based on n-bit int, lsb """
         invalid = -26
         dnu = 26  # this value seems to be invalid
         y = np.nan if u < invalid or u > dnu else u
         return y
 
     def slot2prn(self, slot):
-        """判断卫星系统"""
+        """ Determine satellite system """
         prn = 0
         sys = uGNSS.NONE
-        if slot >= 1 and slot <= 63:
+        if 1 <= slot <= 63:
             prn = slot
             sys = uGNSS.BDS
         elif slot <= 100:
@@ -99,14 +93,13 @@ class cssr_bdsC(cssr):
         return sys, prn
 
     def decode_head(self, v, st=-1):
-        """ 解码头文件 """
-        sow=v['tow']
+        """ Decode header """
+        sow = v['tow']
         self.tod = v['tod']
         iodssr = int(v['iodssr'])
         if st == sCSSR.MASK:
             self.iodssr = iodssr
         if self.tow0 >= 0:
-            # self.tow = self.tow0 + self.tod
             self.tow = sow
             if self.week >= 0:
                 self.time = bdt2gpst(bdt2time(self.week, self.tow))
@@ -117,9 +110,7 @@ class cssr_bdsC(cssr):
 
     def add_gnss(self, mask_array, blen, gnss):
         for mask_str in mask_array:
-            # 将二进制字符串转换为整数
-            mask_int = int(mask_str, 2)  # 将二进制字符串转换为整数
-            # 解码掩码
+            mask_int = int(mask_str, 2)
             prn, nsat = self.decode_mask(mask_int, blen)
             self.nsat_g[gnss] = nsat
             self.nsat_n += nsat
@@ -132,31 +123,28 @@ class cssr_bdsC(cssr):
                 self.sat_n.append(sat)
                 self.gnss_n.append(gnss)
 
-    def decode_cssr_mask(self, v,):
-        """decode MT1 Mask message """
-        head=self.decode_head(v, sCSSR.MASK)
+    def decode_cssr_mask(self, v):
+        """ Decode MT1 Mask message """
+        head = self.decode_head(v, sCSSR.MASK)
         self.iodp = v['iodp']
 
-        mask_bds, mask_gps, mask_gal, mask_glo = \
-            v['BDS'], v['GPS'], v['Galileo'], v['GLONASS']
+        mask_bds, mask_gps, mask_gal, mask_glo = v['BDS'], v['GPS'], v['Galileo'], v['GLONASS']
 
-        if self.iodp != self.iodp_p: #iodp_p表示之前历元的iodp
-            # 这里是对之前变量的值进行初始化或者更新
+        if self.iodp != self.iodp_p:  # iodp_p indicates the iodp of the previous epoch
             self.sat_n_p = self.sat_n
             self.iodssr_p = self.iodssr
             self.sig_n_p = self.sig_n
             self.iodp_p = self.iodp
 
-            self.nsat_n = 0 #解码得到的播发改正数的卫星总数量，包含所有的导航系统，比如为59
+            self.nsat_n = 0  # Total number of broadcast correction satellites decoded, including all navigation systems
             self.nsig_n = []
-            self.sys_n = []#对应上面59颗卫星中每颗卫星的导航系统
-            self.gnss_n = []#对应上面59颗卫星中每颗卫星的导航系统，和sys_n基本一样，两者通过gnss2sys函数转换
-            self.sat_n = []#对应上面59颗卫星中每颗卫星的编号（从GPS的1号星开始的累计编号）
+            self.sys_n = []  # Navigation systems of each satellite among the 59 satellites
+            self.gnss_n = []  # Navigation systems of each satellite among the 59 satellites, similar to sys_n
+            self.sat_n = []  # Index of each satellite among the 59 satellites (accumulated from GPS satellite 1)
             self.nsig_total = 0
             self.sig_n = []
             self.nm_idx = np.zeros(self.SYSMAX, dtype=int)
-            self.ngnss = 0 #可用的导航系统数（如GPS+BDS，该值为2）
-            # self.gnss_idx = np.zeros(self.ngnss, dtype=int)
+            self.ngnss = 0  # Number of available navigation systems (e.g., GPS+BDS, value is 2)
             self.nsat_g = np.zeros(self.SYSMAX, dtype=int)
 
             self.add_gnss(mask_bds, 63, sGNSS.BDS)
@@ -164,7 +152,6 @@ class cssr_bdsC(cssr):
             self.add_gnss(mask_gal, 37, sGNSS.GAL)
             self.add_gnss(mask_glo, 37, sGNSS.GLO)
 
-            # 这里是针对每颗卫星进行存储器轨道、钟差的改正数变量进行初始化
             inet = 0
             self.lc[inet].dclk = {}
             self.lc[inet].dorb = {}
@@ -172,26 +159,23 @@ class cssr_bdsC(cssr):
             self.lc[inet].iodc = {}
             self.lc[inet].iodc_c = {}
             self.lc[inet].cbias = {}
-            self.nsig_n = np.ones(self.nsat_n, dtype=int)*self.nsig_max
+            self.nsig_n = np.ones(self.nsat_n, dtype=int) * self.nsig_max
             self.sig_n = {}
             self.ura = {}
 
-            # fallback for inconsistent clock update
             self.lc[inet].dclk_p = {}
             self.lc[inet].iodc_c_p = {}
-            msg="Change of IODP in decode_cssr_mask"
+            msg = "Change of IODP in decode_cssr_mask"
             self.log_msg(msg)
 
-        # 这里存储的是对应于参数解码中的IOD SSR (SSR版本号）
-        # IOD SSR 变化表明数据生成配置的变化。各类型数据首先需要保证各自 IOD SSR 相同，才可匹配使用
+        # Store the IOD SSR (SSR version number) in the parameter decoding
         self.iodssr = head['iodssr']
 
         self.lc[0].cstat |= (1 << sCType.MASK)
         self.lc[0].t0[sCType.MASK] = self.time
-        # self.lc[0].t0[0][sCType.MASK] = self.time
-        self.log_msg("decode_ssr_mask: iodp= "+str(self.iodp))
+        self.log_msg("decode_ssr_mask: iodp= " + str(self.iodp))
 
-    def decode_cssr_orb(self, v, inet=0):#合并轨道处理这两个函数
+    def decode_cssr_orb(self, v, inet=0):
         """decode MT2 orbit + URA message """
         head = self.decode_head(v)
         sat_n = np.array(self.sat_n)
@@ -299,7 +283,7 @@ class cssr_bdsC(cssr):
             str_cssr_clk_sat = 'cssr_clk_sat: %s %s %d %.3f ' % (sat2id(sat), time2str(self.time), iodc, self.lc[inet].dclk[sat])
             self.log_msg(str_cssr_clk_sat)
     def decode_cssr_clk(self, v, inet=0):
-        """decode MT4 Clock Correction message """
+        """ decode MT4 Clock Correction message """
         head = self.decode_head(v)
         if self.iodssr != head['iodssr']:
             return -1
@@ -307,18 +291,18 @@ class cssr_bdsC(cssr):
         iodp = v['iodp']
         st1 = v['sub']
 
-        st1_value = st1[0]  # 提取st1数组中的唯一值
+        st1_value = st1[0]  # Extract the unique value from the st1 array
 
         if iodp != self.iodp:
             return -1
-        # 如果iodp匹配，则解码23颗卫星钟差的钟差参数,得到：
-        # 卫星钟差的IODC:   self.lc[inet].iodc_c[sat] = iodc 这个每颗卫星不一样
-        # 卫星钟差改正：     self.lc[inet].dclk[sat] =
-        # 这颗卫星的时间，   self.lc[inet].t0[sat][sCType.CLOCK] = self.time 这里分别保存了每一种参数的时间
-        # 钟差的iod_ssr:   self.iodssr_c[sCType.CLOCK] = head['iodssr']
+        # If iodp matches, decode the clock correction parameters for 23 satellites, and obtain:
+        # Satellite clock correction IODC: self.lc[inet].iodc_c[sat] = iodc, which is different for each satellite
+        # Satellite clock correction: self.lc[inet].dclk[sat] =
+        # Time for this satellite: self.lc[inet].t0[sat][sCType.CLOCK] = self.time, which stores the time for each parameter
+        # Clock correction iod_ssr: self.iodssr_c[sCType.CLOCK] = head['iodssr']
         for i in range(23):
             idx = st1_value * 23 + i
-            # 使用 idx 访问 self.sat_n 或进行其他操作
+            # Use idx to access self.sat_n or perform other operations
             if idx < self.nsat_n:
                 sat = self.sat_n[idx]
                 self.decode_cssr_clk_sat(v,i, inet, sat)
@@ -328,6 +312,7 @@ class cssr_bdsC(cssr):
                     self.lc[inet].t0[sat][sCType.CLOCK] = self.time
                 except TypeError as e:
                     print(f"An error occurred: {e}")
+                    pdb.set_trace()
 
         self.iodssr_c[sCType.CLOCK] = head['iodssr']
         self.lc[inet].cstat |= (1 << sCType.CLOCK)
@@ -427,9 +412,6 @@ class cssr_bdsC(cssr):
         orbit_data = {}
         clock_data = {}
         ns = len(B2BData0.sat_n)
-        rs0 = np.ones((ns, 3))*np.nan
-        vs0 = np.ones((ns, 3))*np.nan
-        dts0 = np.ones((ns, 1))*np.nan
         rs = np.ones((ns, 3))*np.nan
         vs = np.ones((ns, 3))*np.nan
         dts = np.ones((ns, 1))*np.nan
@@ -442,13 +424,9 @@ class cssr_bdsC(cssr):
             sat_id= sat2id(sat)
             if not (sys == uGNSS.GPS or sys==uGNSS.BDS):
                 continue
-            # cs.iodssr: mask里面解码得到的
-            #iodssr_c[sCType.ORBIT] 是轨道部分解码得到的IOD
             if B2BData0.iodssr >= 0 and B2BData0.iodssr_c[sCType.ORBIT] == B2BData0.iodssr:
-                # 判断解算的卫星是否在B2b解码的改正数里面
                 if sat not in B2BData0.sat_n:
                     continue
-            # 判断这颗卫星是否有轨道改正
             if sat not in B2BData0.lc[0].iode.keys():
                 continue
             if sat not in B2BData0.lc[0].dorb:
@@ -499,27 +477,23 @@ class cssr_bdsC(cssr):
             # Apply SSR correction
             #
             rs[j, :] -= dorb_e
-            dts_brdc=dts[j]*rCST.CLIGHT
             dts[j] += dclk/rCST.CLIGHT  # [m] -> [s]
             # str_xyz="{} {} ssrc xyz [m] {:14.3f} {:14.3f} {:14.3f} clk [ms] {:12.6f}".format(time2str(epoch_time), sat2id(sat),rs[j, 0], rs[j, 1], rs[j, 2], dclk)
             # self.log_msg(str_xyz)
 
-            # 这里的时间其实是最新的钟差
             # dtclk=timediff(epoch_time,B2BData0.lc[0].t0[sat][sCType.CLOCK])
             dtclk=timediff(epoch_time,B2BData0.lc[0].t0[sat][sCType.CLOCK])
             dtorb=timediff(epoch_time,B2BData0.lc[0].t0[sat][sCType.ORBIT])
-            str_diff="obst= {} obst_orbt={} obst_clkt={} sat={} diff rac[m] {:8.3f} {:8.3f} {:8.3f} clk[m] {:12.6f}  dclk[m] {:12.6f} "\
-                .format(time2str(epoch_time),dtorb,dtclk,sat2id(sat),dorb[0], dorb[1], dorb[2],\
-                        d_dts[j, 0]*rCST.CLIGHT,dclk)
             str_iod="nav_iod={:4d} mask_iod={:4d} clock_iod={:4d} orbit_iod={:4d}"\
                 .format(B2BData0.lc[0].iode[sat],B2BData0.iodssr,B2BData0.lc[0].iodc_c[sat],B2BData0.lc[0].iodc[sat])
             if dtclk>max_clock_delay or dtorb>max_orbit_delay:
                 self.log_msg("ERROR: large orbit/clock difference")
-                self.log_msg("ERROR Data: "+str_diff+str_iod)
+                self.log_msg("ERROR Data: "+str_iod)
                 B2BData0.deletePRN(sat)
                 continue
             else:
-                self.log_msg(str_diff+str_iod)
+                self.log_msg(str_iod)
+                # self.log_msg(str_brd_prec + str_diff + str_iod)
             peph.pos[sat-1,0]=rs[j,0]
             peph.pos[sat-1,1]=rs[j,1]
             peph.pos[sat-1,2]=rs[j,2]

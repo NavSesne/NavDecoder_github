@@ -1,11 +1,10 @@
 """
- decode the PPP-B2b products from UM980/UM982 module of Unicore 
+ static test for PPP (BeiDou PPP)
 """
+from binascii import unhexlify
 from copy import deepcopy
 import numpy as np
-import  os,sys
-base_path=os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(base_path,"download"))
+import  os
 
 from B2b_HAS_decoder.gnss import *
 from B2b_HAS_decoder.peph import peph
@@ -13,16 +12,16 @@ from B2b_HAS_decoder.cssr_bds_um982 import cssr_bdsC
 from B2b_HAS_decoder.rinex import rnxdec
 from B2b_HAS_decoder.cssrlib import sCSSR, sCType, local_corr
 from datetime import datetime, timedelta
+from download.down_PPP_products import *
 from copy import deepcopy
 from B2b_UM980_decoder.ext124 import extract_all_pppb2binfo_content
-from down_PPP_products import down_PPP_data
+
 
 class B2BData:
     def __init__(self):
         self.init_empty()
 
     def init_empty(self):
-        # 初始化所有属性为None或空列表/字典，保持结构一致但不包含实际数据
         self.cssrmode = None
         self.sat_n = []
         self.iodssr = None
@@ -32,7 +31,6 @@ class B2BData:
         self.subtype = None
 
     def update_value_from(self, source_object):
-        # 从提供的对象复制属性，如果属性不存在则使用默认值
         self.cssrmode = getattr(source_object, 'cssrmode', None)
         self.sat_n = deepcopy(getattr(source_object, 'sat_n', []))
         self.iodssr = getattr(source_object, 'iodssr', None)
@@ -63,7 +61,6 @@ class B2BData:
                 continue
             if sat not in self.lc[0].t0:
                 self.lc[0].t0[sat] = {}
-            # 钟差和轨道IOD匹配，使用新的钟差
             if source_object.lc[0].iodc[sat] == source_object.lc[0].iodc_c[sat]:
                 self.lc[0].iode[sat] = deepcopy(source_object.lc[0].iode[sat])
                 self.lc[0].dorb[sat] = deepcopy(source_object.lc[0].dorb[sat])
@@ -73,7 +70,6 @@ class B2BData:
                 self.lc[0].dclk[sat] = deepcopy(source_object.lc[0].dclk[sat])
                 self.lc[0].iodc_c[sat] = deepcopy(source_object.lc[0].iodc_c[sat])
                 self.lc[0].t0[sat][sCType.CLOCK] = deepcopy(source_object.lc[0].t0[sat][sCType.CLOCK])
-            # 不更新钟差的改正数和IOD
             else:
                 self.lc[0].iode[sat] = deepcopy(source_object.lc[0].iode[sat])
                 self.lc[0].dorb[sat] = deepcopy(source_object.lc[0].dorb[sat])
@@ -91,9 +87,8 @@ class B2BData:
         self.lc[0].t0[sat][sCType.CLOCK] = None
 
 
-'''这里把功能合并，可以直接读取UM98的文件'''
 def read_um982_b2b_info(file_bds):
-    output_file_path = file_bds+"_b2b"  # 把解码后的文件存在这里
+    output_file_path = file_bds+"_b2b"  #Save the decoded files
     extract_all_pppb2binfo_content(file_bds, output_file_path)
 
     # 定义数据类型
@@ -123,14 +118,14 @@ def read_um982_b2b_info(file_bds):
             msg_type = int(parts[0])
 
             if msg_type == 1:
-                # 处理 bdsmsg1 类型的消息
+                # Process bdsmsg1 type messages
                 week, tow, prn, iodssr, iodp, tod = map(int, [part.split(':')[1] for part in parts[1:7]])
                 BDS, GPS, Galileo, GLONASS = [part.split(':')[1] for part in parts[7:]]
                 data1.append((week, tow, prn, iodssr, iodp, tod, BDS, GPS, Galileo, GLONASS))
                 v_all.append(np.array([data1[-1]], dtype=dtype1))
 
             elif msg_type == 2:
-                # 处理 bdsmsg2 类型的消息
+                # Process bdsmsg2 type messages
                 week, tow, prn, iodssr, iodp, tod = map(int, [part.split(':')[1] for part in parts[1:7]])
                 pairs = parts[7:]
                 satslot, iodn, Rorb, Aorb, Corb, iodcorr, URAI = [], [], [], [], [], [], []
@@ -145,7 +140,7 @@ def read_um982_b2b_info(file_bds):
                 data2.append((week, tow, prn, iodssr, iodp, tod, satslot, iodn, Rorb, Aorb, Corb, iodcorr, URAI))
                 v_all.append(np.array([data2[-1]], dtype=dtype2))
             elif msg_type == 4:
-                # 处理 bdsmsg4 类型的消息
+                # Process bdsmsg4 type messages
                 week, tow, prn, sub, iodssr, iodp, tod = map(int, [part.split(':')[1] for part in parts[1:8]])
                 iodcorr_sc0_pairs = parts[8:]
                 iodcorr = []
@@ -158,34 +153,39 @@ def read_um982_b2b_info(file_bds):
 
     return v_all
 
+def relative_to_absolute(relative_path):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, relative_path)
 
-# start the batch processing
-start_date = datetime(2024,4, 15)
+# Start for the configuration
+max_orbit_delay=300
+max_clock_delay=30
+start_date = datetime(2024, 4, 15)
 process_days = 1
-max_orbit_delay = 300
-max_clock_delay = 30
-base_path = os.path.dirname(__file__)
-file_bds_template = os.path.join(base_path, 'test_data', 'log_UM982_{}_00.txt')
-nav_file_template = os.path.join(base_path, 'test_data', 'BRD400DLR_S_{}0000_01D_MN.rnx')
-corr_dir_template = os.path.join(base_path, 'test_data', 'UM982{}_B2BRTCM')
+file_bds_template = r'test_data\log_UM982_{}_00.txt'
+nav_file_template = r'test_data\eph\BRD400DLR_S_{}0000_01D_MN.rnx'
+corr_dir_template = r'test_data\UM982{}_B2BRTCM'
+#End for the configuration
+B2b_BDS = relative_to_absolute(file_bds_template)
+nav_BDS = relative_to_absolute(nav_file_template)
+sol_BDS = relative_to_absolute(corr_dir_template)
 
-# 1. download the precise products automatically
-down_PPP_data(start_date, process_days,"WHR", os.path.dirname(nav_file_template))
 for i in range(process_days):
     current_date = start_date + timedelta(days=i)
+    previous_date = current_date - timedelta(days=1)
+    next_date = current_date + timedelta(days=1)
     ep = [current_date.year, current_date.month, current_date.day,
-          current_date.hour, current_date.minute, current_date.second]
+                  current_date.hour, current_date.minute, current_date.second]
     doy = current_date.timetuple().tm_yday
     year = current_date.year
-    formatted_date = f"{year}{str(doy).zfill(3)}"  # 确保年积日为三位数字格式
-
-    # 替换文件名中的年积日和年份
+    formatted_date = f"{year}{str(doy).zfill(3)}" 
+    down_NAV_data(previous_date,3,os.path.dirname(nav_BDS))
     obs_date = f"{year}{str(current_date.month).zfill(2)}{str(current_date.day).zfill(2)}"
-    file_bds = file_bds_template.format(obs_date)
-    nav_file = nav_file_template.format(formatted_date)
+    file_bds = B2b_BDS.format(obs_date)
+    nav_file = nav_BDS.format(formatted_date)
 
     # generate the output file
-    corr_dir = corr_dir_template.format(formatted_date)
+    corr_dir = sol_BDS.format(formatted_date)
     parent_dir = os.path.dirname(corr_dir)
     if not os.path.exists(parent_dir):
         os.makedirs(parent_dir)
@@ -203,13 +203,11 @@ for i in range(process_days):
     doy = time2doy(time)
     cs.week = week
     cs.tow0 = tow // 86400 * 86400
-    '''从文件读取读取UM982改正数'''
-    if not os.path.exists(file_bds):
-        print("correction file not found: "+file_bds)
+    #Read UM982 corrections from the file
     v = read_um982_b2b_info(file_bds)
-    '''从TCP和串口读取UM982改正数'''
+    # Read UM982 corrections from the TCP or serial
+    # To be implemented
 
-    '''读取参考星历和钟差'''
     rnx = rnxdec()
     nav = Nav()
     orb = peph()
@@ -217,8 +215,6 @@ for i in range(process_days):
     nav_out = Nav()
     sp_out = peph()
 
-    # 这两个变量是所有卫星通用的，如果某刻卫星中断后重新出现，基于这个时间是没办法判断的
-    # 所以这个变量只能用来判断数据是否历元更新，因为历元是按照时间来的
     record_orbit_update_time = None
     record_clock_update_time = None
     orbit_data = {}
@@ -226,6 +222,11 @@ for i in range(process_days):
     B2BData0 = B2BData()
     delay = 0
     for row in v:
+        # if row['tow']>=tow or row['tow']<tow-120:
+        #     continue
+        # print(row)
+        # corr_str = np.array2string(row, separator=', ')
+        # cs.log_msg(corr_str)
         buff = row
         cs.decode_cssr(buff)
         intervals = 5
@@ -239,9 +240,7 @@ for i in range(process_days):
                 str_obs2 = time2str(record_clock_update_time)
                 time_test = epoch2time([2023, 12, 3, 0, 1, 55])
                 if timediff(time_clock_sat,
-                            record_clock_update_time) >= 1:  # 到这里，record_clock_update_time这一时刻的钟差已经全部解析完毕，可用
-                    '''生成处理GNSS的时间间隔，为了模拟实时要求，保证观测时间要早于可用的轨道和钟差时间'''
-                    # 根据current_time查找最新，可用的产品，实时的产品时间应远于目前的
+                            record_clock_update_time) >= 1: 
                     str_obs = time2str(current_time)
                     if abs(timediff(current_time, time_test)) < 1:
                         print(time2str(time_test))
@@ -274,7 +273,6 @@ for i in range(process_days):
                     record_orbit_update_time = cs.time
                 time_orbit_sat = cs.time
                 if abs(timediff(time_orbit_sat, record_orbit_update_time)) > 1:
-                    '''这里轨道更新了，可能也就意味着进行广播星历匹配的IOD更新了，且之后解码得到的都是新的历元的钟差信息，所以这里也重置B2BData0保存的数据信息'''
                     record_orbit_update_time = time_orbit_sat
                     B2BData0.update_value_from(cs)
 

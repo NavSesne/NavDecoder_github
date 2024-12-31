@@ -11,7 +11,7 @@
 #coding=utf-8
 import os
 import sys
-from cmn_tools import *
+from rtkcmn import *
 import datetime
 from dateutil.relativedelta import relativedelta
 from down_tools import *
@@ -65,19 +65,18 @@ def get_xyz_Sinex(year,month,day,acs,sites,dir_dest):
         with open(snx_file, 'r', encoding='utf-8') as fo:
             lines = fo.readlines()
         
-        site_info = {site.upper(): [] for site in sites}  # 使用字典存储每个站点的信息
+        site_info = {site.upper(): [] for site in sites}
 
         for line in lines:
             site_code=None
             parts = line.strip().split()
             if not parts:
-                continue  # 跳过空行
+                continue
             if parts[0] in site_info:
                 site_code = parts[0]
             elif len(parts) > 2 and parts[2] in site_info:
                 site_code = parts[2]
 
-            # 如果找到站点代码，则处理该行
             if site_code:
                 site_info[site_code].append(line)
         for ss, staInfo in site_info.items():
@@ -97,7 +96,7 @@ def get_xyz_Sinex(year,month,day,acs,sites,dir_dest):
 
             xyzRef.append(dxyz)
             rcvRef.append(ss)
-            blh = xyz2blh(*dxyz)  # 假设xyz2blh已经定义
+            blh = xyz2blh(*dxyz) 
             # print(f"{ss}  {blh[0]} {blh[1]} {blh[2]}")
     except Exception as e:
         print(sys.argv)

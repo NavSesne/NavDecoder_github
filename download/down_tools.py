@@ -12,12 +12,12 @@ from datetime import datetime
 import os
 from dateutil.relativedelta import relativedelta
 currentpath=os.path.dirname(os.path.abspath(__file__))
-PPPRTK_path=os.path.dirname(currentpath)
-bin_wget=os.path.join(PPPRTK_path,"bin",'wget.exe')
-bin_curl=os.path.join(PPPRTK_path,"bin",'curl.exe')
-bin_gzip=os.path.join(PPPRTK_path,"bin",'gzip.exe')
-bin_crx =os.path.join(PPPRTK_path,"bin",'crx2rnx.exe')
-bin_gfzrnx=os.path.join(PPPRTK_path,"bin",'gfzrnx_x64.exe')
+root_path=os.path.dirname(currentpath)
+bin_wget=os.path.join(root_path,"bin",'wget.exe')
+bin_curl=os.path.join(root_path,"bin",'curl.exe')
+bin_gzip=os.path.join(root_path,"bin",'gzip.exe')
+bin_crx =os.path.join(root_path,"bin",'crx2rnx.exe')
+bin_gfzrnx=os.path.join(root_path,"bin",'gfzrnx_x64.exe')
 
 def ymd2doy(year, mon, day):
     dn = datetime(year, mon, day, 0, 0, 0)
@@ -38,7 +38,6 @@ def call_curl_(dir_dst, url):
     print ("curl cmd="+cmd)
     os.system(cmd)
 def download_compress(rpath,local_dir,name,suffix):
-    # 检查本地是否存在文件
     compressed_name = name + suffix
     local_file_path = os.path.join(local_dir, name)
     local_compressed_file_path = os.path.join(local_dir, compressed_name)

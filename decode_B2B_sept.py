@@ -11,13 +11,13 @@ from B2b_HAS_decoder.cssr_bds_sept import cssr_bds
 from B2b_HAS_decoder.rinex import rnxdec
 from B2b_HAS_decoder.sdr_ldpc_test import *
 from B2b_HAS_decoder.cssrlib import sCSSR,sCType,local_corr
+from download.down_PPP_products import *
 from datetime import datetime, timedelta
 
 class B2BData:
     def __init__(self):
         self.init_empty()
     def init_empty(self):
-        # 初始化所有属性为None或空列表/字典，保持结构一致但不包含实际数据
         self.cssrmode = None
         self.sat_n = []
         self.iodssr = None
@@ -27,7 +27,6 @@ class B2BData:
         self.subtype = None
 
     def update_value_from(self, source_object):
-        # 从提供的对象复制属性，如果属性不存在则使用默认值
         self.cssrmode = getattr(source_object, 'cssrmode', None)
         self.sat_n = deepcopy(getattr(source_object, 'sat_n', []))
         self.iodssr = getattr(source_object, 'iodssr', None)
@@ -58,7 +57,7 @@ class B2BData:
                 continue
             if sat not in self.lc[0].t0:
                 self.lc[0].t0[sat] = {}
-            # 钟差和轨道IOD匹配，使用新的钟差
+            # Matching IOD for satellite and orbit 
             if source_object.lc[0].iodc[sat] == source_object.lc[0].iodc_c[sat]:
                 self.lc[0].iode[sat] = deepcopy(source_object.lc[0].iode[sat])
                 self.lc[0].dorb[sat] = deepcopy(source_object.lc[0].dorb[sat])
@@ -68,7 +67,6 @@ class B2BData:
                 self.lc[0].dclk[sat] = deepcopy(source_object.lc[0].dclk[sat])
                 self.lc[0].iodc_c[sat] = deepcopy(source_object.lc[0].iodc_c[sat])
                 self.lc[0].t0[sat][sCType.CLOCK] = deepcopy(source_object.lc[0].t0[sat][sCType.CLOCK])
-            # 不更新钟差的改正数和IOD
             else:
                 self.lc[0].iode[sat] = deepcopy(source_object.lc[0].iode[sat])
                 self.lc[0].dorb[sat] = deepcopy(source_object.lc[0].dorb[sat])
@@ -85,41 +83,48 @@ class B2BData:
         self.lc[0].iodc_c[sat] = 0
         self.lc[0].t0[sat][sCType.CLOCK] = None
 
-# Main setting for the processing
-start_date = datetime(2024, 5, 14)
-process_days = 1
+def relative_to_absolute(relative_path):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, relative_path)
 
+# Start for the configuration
 max_orbit_delay=300
 max_clock_delay=30
-file_bds_template = r'D:\work_lewen\source_code\git_lewen\NavDecoder\test_data\SEPT{}0.{}__SBF_BDSRawB2b.txt'
-nav_file_template = r'D:\work_lewen\source_code\git_lewen\NavDecoder\test_data\BRD400DLR_S_{}0000_01D_MN.rnx'
-corr_dir_template = r'D:\work_lewen\source_code\git_lewen\NavDecoder\test_data\SEPT{}_B2B_new'
+start_date = datetime(2024, 5, 14)
+process_days = 1
+file_bds_template = r'test_data\SEPT{}0.{}__SBF_BDSRawB2b.txt'
+nav_file_template = r'test_data\eph\BRD400DLR_S_{}0000_01D_MN.rnx'
+corr_dir_template = r'test_data\SEPT{}_B2b'
+#End for the configuration
+B2b_BDS = relative_to_absolute(file_bds_template)
+nav_BDS = relative_to_absolute(nav_file_template)
+sol_BDS = relative_to_absolute(corr_dir_template)
 for i in range(process_days):
     current_date = start_date + timedelta(days=i)
+    previous_date = current_date - timedelta(days=1)
+    next_date = current_date + timedelta(days=1)
     ep = [current_date.year, current_date.month, current_date.day,
                   current_date.hour, current_date.minute, current_date.second]
     doy = current_date.timetuple().tm_yday
     year = current_date.year
     formatted_date = f"{year}{str(doy).zfill(3)}" 
-
-    file_bds = file_bds_template.format(str(doy).zfill(3),year-2000)
-    nav_file = nav_file_template.format(formatted_date)
+    down_NAV_data(previous_date,3,os.path.dirname(nav_BDS))
+    file_bds = B2b_BDS.format(str(doy).zfill(3),year-2000)
+    nav_file = nav_BDS.format(formatted_date)
 
     if not os.path.exists(file_bds):
         print("File not found: "+file_bds)
         continue
 
     # extend the navigation file to 3-days
-    previous_date = current_date - timedelta(days=1)
     yyyy_doy0 = f"{year}{str(previous_date.timetuple().tm_yday).zfill(3)}"
-    nav_file0 = nav_file_template.format(yyyy_doy0)
+    nav_file0 = nav_BDS.format(yyyy_doy0)
 
-    next_date = current_date + timedelta(days=1)
     yyyy_doy2 = f"{year}{str(next_date.timetuple().tm_yday).zfill(3)}" 
-    nav_file2 = nav_file_template.format(yyyy_doy2)
+    nav_file2 = nav_BDS.format(yyyy_doy2)
 
     # generate the output file
-    corr_dir = corr_dir_template.format(formatted_date)
+    corr_dir = sol_BDS.format(formatted_date)
     parent_dir = os.path.dirname(corr_dir)
     if not os.path.exists(parent_dir):
         os.makedirs(parent_dir)
@@ -176,9 +181,7 @@ for i in range(process_days):
                 str_obs1 = time2str(time_clock_sat)
                 str_obs2 = time2str(record_clock_update_time)
                 time_test = epoch2time([2023, 12, 3, 0, 1, 55])
-                if timediff(time_clock_sat, record_clock_update_time)>=1: #到这里，record_clock_update_time这一时刻的钟差已经全部解析完毕，可用
-                    '''生成处理GNSS的时间间隔，为了模拟实时要求，保证观测时间要早于可用的轨道和钟差时间'''
-                    # 根据current_time查找最新，可用的产品，实时的产品时间应远于目前的
+                if timediff(time_clock_sat, record_clock_update_time)>=1: 
                     str_obs=time2str(current_time)
                     if abs(timediff(current_time,time_test))<1:
                         print(time2str(time_test))
@@ -207,7 +210,6 @@ for i in range(process_days):
                     record_orbit_update_time=cs.time
                 time_orbit_sat=cs.time
                 if abs(timediff(time_orbit_sat, record_orbit_update_time))>1:
-                    '''这里轨道更新了，可能也就意味着进行广播星历匹配的IOD更新了，且之后解码得到的都是新的历元的钟差信息，所以这里也重置B2BData0保存的数据信息'''
                     record_orbit_update_time=time_orbit_sat
                     B2BData0.update_value_from(cs)
 
