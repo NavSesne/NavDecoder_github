@@ -10,14 +10,47 @@
 """
 from datetime import datetime
 import os
+import shutil
+import platform
 from dateutil.relativedelta import relativedelta
-currentpath=os.path.dirname(os.path.abspath(__file__))
-root_path=os.path.dirname(currentpath)
-bin_wget=os.path.join(root_path,"bin",'wget.exe')
-bin_curl=os.path.join(root_path,"bin",'curl.exe')
-bin_gzip=os.path.join(root_path,"bin",'gzip.exe')
-bin_crx =os.path.join(root_path,"bin",'crx2rnx.exe')
-bin_gfzrnx=os.path.join(root_path,"bin",'gfzrnx_x64.exe')
+
+if platform.system() == "Linux":
+    tools = {
+        "wget": "sudo apt install wget  # For Debian/Ubuntu\nsudo yum install wget  # For CentOS/RHEL",
+        "curl": "sudo apt install curl  # For Debian/Ubuntu\nsudo yum install curl  # For CentOS/RHEL",
+        "gzip": "sudo apt install gzip  # For Debian/Ubuntu\nsudo yum install gzip  # For CentOS/RHEL"
+    }
+
+    for tool, install_cmd in tools.items():
+        tool_path = shutil.which(tool)
+        if tool_path:
+            print(f"{tool} found: {tool_path}")
+        else:
+            print(f"Error: {tool} not found.")
+            print(f"To install it, run:\n{install_cmd}")
+
+    # 打印所有工具检测结果
+    print("\nEnvironment check completed.")
+
+else:
+    print("Please check the existance of the download exe file.")
+
+currentpath = os.path.dirname(os.path.abspath(__file__))
+root_path = os.path.dirname(currentpath)
+
+if platform.system() == "Linux":
+    bin_wget = shutil.which("wget") or "wget"
+    bin_curl = shutil.which("curl") or "curl"
+    bin_gzip = shutil.which("gzip") or "gzip"
+    bin_crx=""
+    bin_gfzrnx=""
+else:
+    bin_wget = os.path.join(root_path, "bin", "wget")
+    bin_curl = os.path.join(root_path, "bin", "curl")
+    bin_gzip = os.path.join(root_path, "bin", "gzip")
+    bin_crx = os.path.join(root_path, "bin", "crx2rnx")
+    bin_gfzrnx = os.path.join(root_path, "bin", "gfzrnx_x64")
+
 
 def ymd2doy(year, mon, day):
     dn = datetime(year, mon, day, 0, 0, 0)

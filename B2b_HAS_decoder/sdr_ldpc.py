@@ -31,17 +31,19 @@ import numpy as np
 from B2b_HAS_decoder.sdr_nb_ldpc import *
 
 # load library of LDPC-codes ([1],[2]) -----------------------------------------
-env = platform.platform()
-dir = os.path.dirname(__file__)
+env = platform.system() 
+dir_path = os.path.abspath(os.path.dirname(__file__))
+
 try:
-    if 'Windows' in env:
-        libldpc = cdll.LoadLibrary(dir + '\\libldpc.so')
-    elif 'Linux' in env:
-        libldpc = cdll.LoadLibrary(dir + '\\libldpc.so')
-    else:
-        raise
-except:
-    print('load libldpc.so error (%s)' % (env))
+    lib_path = os.path.join(dir_path, 'libldpc.so')
+    if env == 'Windows':
+        lib_path = os.path.join(dir_path, 'libldpc.so')  # Windows 下应使用 DLL
+    elif env == 'Linux':
+        lib_path = os.path.join(dir_path, 'libldpc.so_lx')
+    print('libldpc.so loaded successfully from:', lib_path)
+except Exception as e:
+    print(f'Failed to load libldpc.so (OS: {env})')
+    print(f'Error: {e}')
     exit()
 
 # constants --------------------------------------------------------------------

@@ -90,9 +90,10 @@ max_orbit_delay=300
 max_clock_delay=30
 start_date = datetime(2024, 5, 14)
 process_days = 1
-file_has_template = r'test_data\SEPT{}0.{}__SBF_GALRawCNAV.txt'
-nav_file_template = r'test_data\eph\BRDC00IGS_R_{}0000_01D_MN.rnx'
-corr_dir_template = r'test_data\SEPT{}_HAS'
+file_has_template = os.path.join('test_data', 'SEPT{}0.{}__SBF_GALRawCNAV.txt')
+nav_file_template = os.path.join('test_data', 'eph', 'BRDC00IGS_R_{}0000_01D_MN.rnx')
+corr_dir_template = os.path.join('test_data', 'SEPT{}_HAS')
+
 #End for the configuration
 HAS_GAL = relative_to_absolute(file_has_template)
 nav_GAL = relative_to_absolute(nav_file_template)
@@ -153,7 +154,7 @@ for i in range(process_days):
 
     # Read the Galileo-HAS Solomon matrix
     currentpath=os.path.dirname(os.path.abspath(__file__))
-    file_gm=os.path.join(currentpath,r"B2b_HAS_decoder\Galileo-HAS-SIS-ICD_1.0_Annex_B_Reed_Solomon_Generator_Matrix.txt")
+    file_gm=os.path.join(currentpath,"B2b_HAS_decoder","Galileo-HAS-SIS-ICD_1.0_Annex_B_Reed_Solomon_Generator_Matrix.txt")
     gMat = np.genfromtxt(file_gm, dtype="u1", delimiter=",")
 
     # Read the navigation file from the successive 3-day

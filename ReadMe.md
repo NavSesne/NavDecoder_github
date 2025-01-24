@@ -32,8 +32,8 @@ nav_file_template = r'test_data\eph\BRDC00IGS_R_{}0000_01D_MN.rnx'  # Template f
 corr_dir_template = r'test_data\SEPT{}_HAS'  # Directory for correction files
 # End of configuration
  ```
-You only need to modify the **start date**, **processing duration**, and **file paths**.
 
+You only need to modify the **start date**, **processing duration**, and **file paths**.
 ## Directory Structure
 - **NavDecoder/B2b_HAS_decoder**: Tools for decoding Septentrio B2b HAS data.
 - **NavDecoder/B2b_UM980_decoder**: Tools for decoding Unicore B2b data.
@@ -69,3 +69,30 @@ You only need to modify the **start date**, **processing duration**, and **file 
 - **down_rinex_nav_4x.py**: Downloads Rinex navigation files in 4.x format.
 - **down_rinex_obs.py**: Downloads Rinex observation files.
 - **down_sinex_pos.py**: Downloads Sinex Pos files and extracts reference coordinates for the specified station.
+
+
+# PPP-B2b and Galileo HAS SSR Correction Data Archive
+
+This repository provides download links for the PPP-B2b and Galileo HAS SSR correction data archives.
+
+## Download Links
+
+### **navcm_HAS_ssr**
+
+- **Download Link:** [Baidu Netdisk](https://pan.baidu.com/s/1yv14UxF68HHLWYyZXJ3aEA)  
+- **Extraction Code:** `7wn6`
+
+---
+
+### **navcm_B2b_ssr**
+
+- **Download Link:** [Baidu Netdisk](https://pan.baidu.com/s/1DdUYe-AnFMM-5id4bkjt0Q)  
+- **Extraction Code:** `6ypj`
+
+---
+
+## How to Access
+
+1. Click on the provided Baidu Netdisk download links.
+2. Enter the corresponding extraction code when prompted.
+3. Download and extract the archive files.

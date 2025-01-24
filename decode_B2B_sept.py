@@ -92,9 +92,10 @@ max_orbit_delay=300
 max_clock_delay=30
 start_date = datetime(2024, 5, 14)
 process_days = 1
-file_bds_template = r'test_data\SEPT{}0.{}__SBF_BDSRawB2b.txt'
-nav_file_template = r'test_data\eph\BRD400DLR_S_{}0000_01D_MN.rnx'
-corr_dir_template = r'test_data\SEPT{}_B2b'
+file_bds_template = os.path.join('test_data', 'SEPT{}0.{}__SBF_BDSRawB2b.txt')
+nav_file_template = os.path.join('test_data', 'eph', 'BRD400DLR_S_{}0000_01D_MN.rnx')
+corr_dir_template = os.path.join('test_data', 'SEPT{}_B2b')
+
 #End for the configuration
 B2b_BDS = relative_to_absolute(file_bds_template)
 nav_BDS = relative_to_absolute(nav_file_template)
